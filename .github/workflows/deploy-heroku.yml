@@ -18,6 +18,16 @@ jobs:
       ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
       USE_LOCAL_CACHE: ${{ secrets.USE_LOCAL_CACHE }}
+      OPENAI_API_KEY_DEFAULT: ${{ secrets.OPENAI_API_KEY_DEFAULT }}
+      OPENAI_BASE_URL_DEFAULT: ${{ secrets.OPENAI_BASE_URL_DEFAULT }}
+      OPENAI_MODEL_DEFAULT: ${{ secrets.OPENAI_MODEL_DEFAULT }}
+      ELEVENLABS_API_KEY_DEFAULT: ${{ secrets.ELEVENLABS_API_KEY_DEFAULT }}
+      AZURE_STT_KEY_DEFAULT: ${{ secrets.AZURE_STT_KEY_DEFAULT }}
+      AZURE_STT_ENDPOINT_DEFAULT: ${{ secrets.AZURE_STT_ENDPOINT_DEFAULT }}
+      R2_ACCOUNT_ID_DEFAULT: ${{ secrets.R2_ACCOUNT_ID_DEFAULT }}
+      R2_ACCESS_KEY_ID_DEFAULT: ${{ secrets.R2_ACCESS_KEY_ID_DEFAULT }}
+      R2_SECRET_ACCESS_KEY_DEFAULT: ${{ secrets.R2_SECRET_ACCESS_KEY_DEFAULT }}
+      R2_BUCKET_DEFAULT: ${{ secrets.R2_BUCKET_DEFAULT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +68,36 @@ jobs:
           fi
           if [ -n "$USE_LOCAL_CACHE" ]; then
             heroku config:set USE_LOCAL_CACHE="$USE_LOCAL_CACHE" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$OPENAI_API_KEY_DEFAULT" ]; then
+            heroku config:set OPENAI_API_KEY_DEFAULT="$OPENAI_API_KEY_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$OPENAI_BASE_URL_DEFAULT" ]; then
+            heroku config:set OPENAI_BASE_URL_DEFAULT="$OPENAI_BASE_URL_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$OPENAI_MODEL_DEFAULT" ]; then
+            heroku config:set OPENAI_MODEL_DEFAULT="$OPENAI_MODEL_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$ELEVENLABS_API_KEY_DEFAULT" ]; then
+            heroku config:set ELEVENLABS_API_KEY_DEFAULT="$ELEVENLABS_API_KEY_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$AZURE_STT_KEY_DEFAULT" ]; then
+            heroku config:set AZURE_STT_KEY_DEFAULT="$AZURE_STT_KEY_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$AZURE_STT_ENDPOINT_DEFAULT" ]; then
+            heroku config:set AZURE_STT_ENDPOINT_DEFAULT="$AZURE_STT_ENDPOINT_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$R2_ACCOUNT_ID_DEFAULT" ]; then
+            heroku config:set R2_ACCOUNT_ID_DEFAULT="$R2_ACCOUNT_ID_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$R2_ACCESS_KEY_ID_DEFAULT" ]; then
+            heroku config:set R2_ACCESS_KEY_ID_DEFAULT="$R2_ACCESS_KEY_ID_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$R2_SECRET_ACCESS_KEY_DEFAULT" ]; then
+            heroku config:set R2_SECRET_ACCESS_KEY_DEFAULT="$R2_SECRET_ACCESS_KEY_DEFAULT" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$R2_BUCKET_DEFAULT" ]; then
+            heroku config:set R2_BUCKET_DEFAULT="$R2_BUCKET_DEFAULT" --app "$HEROKU_APP_NAME"
           fi
 
       - name: Deploy to Heroku

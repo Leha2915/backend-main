@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from datetime import datetime
 from typing import List, Literal, Tuple, Optional
@@ -26,6 +27,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _resolve_secret_or_default(value: str | None, env_name: str) -> str:
+    if value and value.strip():
+        return value.strip()
+    return os.getenv(env_name, "").strip()
+
+
 async def id_by_username(username: str, db: AsyncSession) -> int | None:
     res = await db.execute(select(User).where(User.username == username))
     user = res.scalars().first()
@@ -42,11 +49,24 @@ async def create_project(
     username: str = Depends(get_current_username),
     encryption_service: EncryptionService = Depends(get_encryption_service),
 ):
-    import secrets
-
     user_id = await id_by_username(username, db)
 
     slug = secrets.token_hex(4)  # z. B. 'abc123ef'
+    api_key = _resolve_secret_or_default(payload.api_key, "OPENAI_API_KEY_DEFAULT")
+    model = _resolve_secret_or_default(payload.model, "OPENAI_MODEL_DEFAULT")
+    base_url = _resolve_secret_or_default(payload.base_url, "OPENAI_BASE_URL_DEFAULT") or "https://api.openai.com/v1"
+    elevenlabs_api_key = _resolve_secret_or_default(payload.elevenlabs_api_key, "ELEVENLABS_API_KEY_DEFAULT")
+    stt_key = _resolve_secret_or_default(payload.stt_key, "AZURE_STT_KEY_DEFAULT")
+    stt_endpoint = _resolve_secret_or_default(payload.stt_endpoint, "AZURE_STT_ENDPOINT_DEFAULT")
+    r2_account_id = _resolve_secret_or_default(payload.r2_account_id, "R2_ACCOUNT_ID_DEFAULT")
+    r2_access_key_id = _resolve_secret_or_default(payload.r2_access_key_id, "R2_ACCESS_KEY_ID_DEFAULT")
+    r2_secret_access_key = _resolve_secret_or_default(payload.r2_secret_access_key, "R2_SECRET_ACCESS_KEY_DEFAULT")
+    r2_bucket = _resolve_secret_or_default(payload.r2_bucket, "R2_BUCKET_DEFAULT")
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Missing OpenAI API key")
+    if not model:
+        raise HTTPException(status_code=400, detail="Missing model")
 
     max_values = -1
 
@@ -58,9 +78,9 @@ async def create_project(
         description=payload.description,
         stimuli=payload.stimuli,
         n_stimuli=payload.n_stimuli,
-        api_key=encryption_service.encrypt(payload.api_key),
-        model=payload.model,
-        base_url=payload.base_url,
+        api_key=encryption_service.encrypt(api_key),
+        model=model,
+        base_url=base_url,
         slug=slug,
         user_id=user_id,
         is_active=True,
@@ -70,20 +90,19 @@ async def create_project(
         advanced_voice_enabled=payload.advanced_voice_enabled,
         interview_mode=payload.interview_mode,
         tree_enabled=payload.tree_enabled,
-        elevenlabs_api_key=encryption_service.encrypt(
-        payload.elevenlabs_api_key),
+        elevenlabs_api_key=encryption_service.encrypt(elevenlabs_api_key),
         max_retries=payload.max_retries,
         auto_send=payload.auto_send,
         time_limit=payload.time_limit,
-        r2_account_id=payload.r2_account_id,
-        r2_access_key_id=encryption_service.encrypt(payload.r2_access_key_id),
-        r2_secret_access_key=encryption_service.encrypt(payload.r2_secret_access_key),
-        r2_bucket=payload.r2_bucket,  
+        r2_account_id=r2_account_id or None,
+        r2_access_key_id=encryption_service.encrypt(r2_access_key_id) if r2_access_key_id else None,
+        r2_secret_access_key=encryption_service.encrypt(r2_secret_access_key) if r2_secret_access_key else None,
+        r2_bucket=r2_bucket or None,
         language=payload.language,
         grouped={},
         internal_id=payload.internal_id,
-        stt_key=encryption_service.encrypt(payload.stt_key),
-        stt_endpoint=payload.stt_endpoint
+        stt_key=encryption_service.encrypt(stt_key) if stt_key else None,
+        stt_endpoint=stt_endpoint or None,
     )
 
     db.add(project)
@@ -98,9 +117,16 @@ async def create_test_project(
     db: AsyncSession = Depends(get_db),
     encryption_service: EncryptionService = Depends(get_encryption_service),
 ):
-    import secrets
-
     slug = secrets.token_hex(4)
+    api_key = _resolve_secret_or_default(payload.api_key, "OPENAI_API_KEY_DEFAULT")
+    model = _resolve_secret_or_default(payload.model, "OPENAI_MODEL_DEFAULT")
+    base_url = _resolve_secret_or_default(payload.base_url, "OPENAI_BASE_URL_DEFAULT") or "https://api.openai.com/v1"
+    elevenlabs_api_key = _resolve_secret_or_default(payload.elevenlabs_api_key, "ELEVENLABS_API_KEY_DEFAULT")
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Missing OpenAI API key")
+    if not model:
+        raise HTTPException(status_code=400, detail="Missing model")
 
     # Use the same logic as for the normal /projects route
     max_values = -1
@@ -112,9 +138,9 @@ async def create_test_project(
         description=payload.description,
         stimuli=payload.stimuli,
         n_stimuli=payload.n_stimuli,
-        api_key=encryption_service.encrypt(payload.api_key),
-        model=payload.model,
-        base_url=payload.base_url,
+        api_key=encryption_service.encrypt(api_key),
+        model=model,
+        base_url=base_url,
         slug=slug,
         user_id=1,
         is_active=True,
@@ -124,7 +150,7 @@ async def create_test_project(
         advanced_voice_enabled=payload.advanced_voice_enabled,
         interview_mode=payload.interview_mode,
         tree_enabled=payload.tree_enabled,
-        elevenlabs_api_key=encryption_service.encrypt(payload.elevenlabs_api_key),
+        elevenlabs_api_key=encryption_service.encrypt(elevenlabs_api_key),
         max_retries=payload.max_retries,
         auto_send = False,
         time_limit = -1,

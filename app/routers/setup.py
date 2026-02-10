@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import List
 
 from fastapi import APIRouter, HTTPException
@@ -13,18 +14,26 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 class KeyTestRequest(BaseModel):
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None
     base_url: str
 class ModelListRequest(BaseModel):
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None
     base_url: str
+
+
+def _resolve_openai_key(value: str | None) -> str:
+    if value and value.strip():
+        return value.strip()
+    return os.getenv("OPENAI_API_KEY_DEFAULT", "").strip()
 
 
 @router.post("/models", response_model=List[str])
 async def list_models(req: ModelListRequest):
-
+    openai_api_key = _resolve_openai_key(req.OPENAI_API_KEY)
+    if not openai_api_key:
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY missing")
     try:
-        client = _client(req.OPENAI_API_KEY, req.base_url)
+        client = _client(openai_api_key, req.base_url)
 
         names: List[str] = []
         try:
@@ -50,8 +59,11 @@ async def list_models(req: ModelListRequest):
 
 @router.post("/testOpenaiAPIKey")
 async def test_key(req: KeyTestRequest):
+    openai_api_key = _resolve_openai_key(req.OPENAI_API_KEY)
+    if not openai_api_key:
+        return {"ok": False, "reason": "Missing API key and no backend default configured"}
     try:
-        client = _client(req.OPENAI_API_KEY, req.base_url)
+        client = _client(openai_api_key, req.base_url)
         async for _ in client.models.list():
             return {"ok": True}
         return {"ok": False, "reason": "No models returned"}

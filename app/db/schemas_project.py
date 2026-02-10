@@ -7,9 +7,9 @@ class ProjectCreate(BaseModel):
     description: str
     stimuli: List[str]
     n_stimuli: int
-    api_key: str
-    model: str
-    base_url: str
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    base_url: Optional[str] = None
     is_active: bool = True
     n_values_max: int
     min_nodes: int = 0

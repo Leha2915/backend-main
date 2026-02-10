@@ -135,6 +135,25 @@ Once the backend is running, API documentation is available at:
 
 ---
 
+## Heroku Secure Defaults
+
+For production, API provider secrets should only be set as Heroku config vars (via GitHub Actions secrets) and never committed into frontend code:
+
+- `OPENAI_API_KEY_DEFAULT`
+- `OPENAI_BASE_URL_DEFAULT`
+- `OPENAI_MODEL_DEFAULT`
+- `ELEVENLABS_API_KEY_DEFAULT`
+- `AZURE_STT_KEY_DEFAULT`
+- `AZURE_STT_ENDPOINT_DEFAULT`
+- `R2_ACCOUNT_ID_DEFAULT`
+- `R2_ACCESS_KEY_ID_DEFAULT`
+- `R2_SECRET_ACCESS_KEY_DEFAULT`
+- `R2_BUCKET_DEFAULT`
+
+The backend automatically uses these values when the corresponding fields are omitted or sent empty in project creation requests.
+
+---
+
 ## Further Documentation
 More detailed documentation can be found in the respective module folders:
 
