@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 # App-Verzeichnis kopieren (inkl. main.py!)
 COPY ./app /code/app
 
-# FastAPI-App starten
-CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000","--workers","3"]
+# FastAPI app startup for both local and Heroku runtime
+CMD ["sh","-c","uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

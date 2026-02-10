@@ -1,7 +1,8 @@
 from __future__ import annotations
+import os
 from typing import AsyncGenerator
 from .models_user import User
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from app.auth.auth_util import hash_password
 
@@ -44,11 +45,20 @@ async def init_models() -> None:
         # create_all ist synchron → via run_sync ausführen
         await conn.run_sync(Base.metadata.create_all)
 
-    #TEST-ANMELDUNG TODO:REMOVE
+    should_seed_admin = os.getenv("SEED_DEFAULT_ADMIN", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if not should_seed_admin:
+        return
+
+    admin_username = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
+    admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "test123")
+
     async with async_session() as session:
-        # Default-User anlegen (wenn nicht vorhanden)
-        res = await session.execute(select(User).where(User.username == "admin"))
-        if not res.scalar():
-            user = User(username="admin", password=hash_password("test123"))
+        res = await session.execute(select(User).where(User.username == admin_username))
+        if not res.scalar_one_or_none():
+            user = User(username=admin_username, password=hash_password(admin_password))
             session.add(user)
             await session.commit()

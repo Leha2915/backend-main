@@ -8,6 +8,12 @@ from urllib.parse import quote_plus
 
 def _build_pg_url() -> str:
     if url := os.getenv("DATABASE_URL"):
+        # Heroku commonly provides postgres://, but SQLAlchemy asyncpg expects
+        # postgresql+asyncpg://
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
 
     user = os.getenv("DB_USER")

@@ -1,0 +1,73 @@
+name: Deploy Backend to Heroku
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_BACKEND }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+      CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+      USE_LOCAL_CACHE: ${{ secrets.USE_LOCAL_CACHE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then
+            echo "Missing HEROKU_API_KEY secret"
+            exit 1
+          fi
+          if [ -z "$HEROKU_APP_NAME" ]; then
+            echo "Missing HEROKU_APP_NAME_BACKEND secret"
+            exit 1
+          fi
+
+      - name: Install Heroku CLI
+        run: curl https://cli-assets.heroku.com/install.sh | sh
+
+      - name: Configure Heroku buildpacks
+        run: |
+          heroku stack:set heroku-24 --app "$HEROKU_APP_NAME"
+          heroku buildpacks:clear --app "$HEROKU_APP_NAME"
+          heroku buildpacks:add --index 1 heroku-community/apt --app "$HEROKU_APP_NAME"
+          heroku buildpacks:add --index 2 heroku/python --app "$HEROKU_APP_NAME"
+
+      - name: Set backend config vars
+        run: |
+          if [ -n "$JWT_SECRET_KEY" ]; then
+            heroku config:set JWT_SECRET_KEY="$JWT_SECRET_KEY" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$ENCRYPTION_KEY" ]; then
+            heroku config:set ENCRYPTION_KEY="$ENCRYPTION_KEY" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$CORS_ORIGINS" ]; then
+            heroku config:set CORS_ORIGINS="$CORS_ORIGINS" --app "$HEROKU_APP_NAME"
+          fi
+          if [ -n "$USE_LOCAL_CACHE" ]; then
+            heroku config:set USE_LOCAL_CACHE="$USE_LOCAL_CACHE" --app "$HEROKU_APP_NAME"
+          fi
+
+      - name: Deploy to Heroku
+        run: |
+          if git remote get-url heroku >/dev/null 2>&1; then
+            git remote set-url heroku "https://heroku:${HEROKU_API_KEY}@git.heroku.com/${HEROKU_APP_NAME}.git"
+          else
+            git remote add heroku "https://heroku:${HEROKU_API_KEY}@git.heroku.com/${HEROKU_APP_NAME}.git"
+          fi
+          git push heroku HEAD:main
+
+      - name: Smoke test backend
+        run: |
+          APP_URL="https://${HEROKU_APP_NAME}.herokuapp.com"
+          curl -fsSL "${APP_URL}/docs" >/dev/null

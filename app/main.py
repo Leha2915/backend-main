@@ -5,6 +5,7 @@ helper for Structured Outputs, and logs the Function-Tree sent from the frontend
 """
 from __future__ import annotations
 import logging
+import os
 from typing import List
 
 from fastapi import FastAPI, HTTPException, Depends
@@ -28,6 +29,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def _get_allowed_origins() -> list[str]:
+    default_origins = [
+        "http://localhost:3000",
+        "https://ladderchat.k8s.iism.kit.edu",
+    ]
+    configured_origins = os.getenv("CORS_ORIGINS", "")
+    origins = [
+        origin.strip()
+        for origin in configured_origins.split(",")
+        if origin.strip()
+    ]
+    for origin in default_origins:
+        if origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 # ───────────────────────── FastAPI app ──────────────────────────────────────
 app = FastAPI(title="Stateless LLM Backend (Structured Outputs v2)")
 app.include_router(users.router)
@@ -47,8 +66,7 @@ app.include_router(export.router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000",
-                   "https://ladderchat.k8s.iism.kit.edu"],
+    allow_origins=_get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,9 +94,11 @@ async def check_credentials(
     raise HTTPException(status_code=404, detail="/auth route was removed! Use /auth-new/login route!")
 
 
-#TODO: absichern
 @app.post("/admin/full-reset")
 async def full_reset():
+    if os.getenv("ENABLE_FULL_RESET_ENDPOINT", "false").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Not found")
+
     from .db.base import Base
     from .db.session import engine
 
