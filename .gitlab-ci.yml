@@ -1,0 +1,55 @@
+variables:
+  KANIKO_VERSION: v1.23.2
+  # assembled later → ${IMAGE_REGISTRY}:${TAG}
+  IMAGE_REGISTRY: ${HARBOR_URL}/${HARBOR_PROJECT}
+  
+stages:
+  - package
+
+# harbor:
+#   stage: package
+#   image:
+#     name: gcr.io/kaniko-project/executor:$KANIKO_VERSION-debug
+#     entrypoint: [""]
+#   script:
+#     - mkdir -p /kaniko/.docker
+#     - echo "{\"auths\":{\"${HARBOR_URL}\":{\"auth\":\"$(printf "%s:%s" "${HARBOR_USER}" "${HARBOR_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+#     - >-
+#       /kaniko/executor
+#       --context "${CI_PROJECT_DIR}"
+#       --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+#       --destination "${WHISPER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+#   rules:
+#     - if: $CI_COMMIT_TAG
+
+docker:
+  stage: package
+  image:
+    name: gcr.io/kaniko-project/executor:$KANIKO_VERSION-debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo '{"auths":{"'${HARBOR_URL}'":{"auth":"'$(printf "%s:%s" "${HARBOR_USERNAME}" "${HARBOR_PASSWORD}" | base64 | tr -d '\n')'"}}}' > /kaniko/.docker/config.json
+    
+    - |
+      if [[ -n "$CI_COMMIT_TAG" ]]; then
+        TAG="$CI_COMMIT_TAG"
+      else
+        TAG="$CI_COMMIT_SHORT_SHA"
+      fi
+      IMAGE_REF="${IMAGE_REGISTRY}:${TAG}"
+      echo "🚀 Final image reference: ${IMAGE_REF}"
+    - echo -e "\n Listing top-level files in $CI_PROJECT_DIR:"
+    - ls -al "$CI_PROJECT_DIR"
+    - |
+      if [[ -f "${CI_PROJECT_DIR}/Dockerfile" ]]; then
+        echo -e "\n Current Dockerfile (${CI_PROJECT_DIR}/Dockerfile):"
+        cat "${CI_PROJECT_DIR}/Dockerfile"
+      else
+        echo -e "\n❌ No Dockerfile found at ${CI_PROJECT_DIR}/Dockerfile"
+      fi
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${IMAGE_REF}"
