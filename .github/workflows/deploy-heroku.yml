@@ -71,7 +71,10 @@ jobs:
 
       - name: Smoke test backend
         run: |
-          APP_URL="https://${HEROKU_APP_NAME}.herokuapp.com"
+          APP_URL="$(
+            heroku apps:info --app "$HEROKU_APP_NAME" --json \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["app"]["web_url"].rstrip("/"))'
+          )"
           for i in {1..20}; do
             if curl -fsSL "${APP_URL}/docs" >/dev/null; then
               exit 0
