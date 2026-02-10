@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, HTTPException, Cookie
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,8 +16,10 @@ from app.auth.auth_util import check_credentials, create_token, get_username, up
 
 USER_OR_PASSWORD_INCORRECT_MSG = "Username or password incorrect"
 
-# Set True only if HTTPS is used
-SEND_COOKIE_SECURE = False
+SEND_COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() in ("1", "true", "yes")
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "none").strip().lower()
+if COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+    COOKIE_SAMESITE = "none"
 
 LOGIN_EXP_MINUTES = 10
 REFRESH_EXP_MINUTES = 480
@@ -42,14 +46,14 @@ def set_cookie(response: Response, access_token: str, refresh_token: str) -> Non
         value=access_token,
         httponly=True,
         secure=SEND_COOKIE_SECURE,
-        samesite="lax"
+        samesite=COOKIE_SAMESITE
     )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
         secure=SEND_COOKIE_SECURE,
-        samesite="lax"
+        samesite=COOKIE_SAMESITE
     )
 
 
