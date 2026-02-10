@@ -2,7 +2,6 @@
 ![Project Status: Active](https://img.shields.io/badge/Status-Active-green)
 
 A backend system for conducting automated laddering interviews using Large Language Models (LLMs).  
-This application builds on the LadderChat prototype and was extended as part of a team software development project at the Faculty of Economics, Institute of Business Informatics (WIN), Karlsruhe Institute of Technology (KIT).
 
 ---
 
