@@ -42,6 +42,10 @@ class Project(Base):
 
     grouped: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False)
 
+    finish_next_title: Mapped[str] = mapped_column(String(500), nullable=True)
+    finish_next_body: Mapped[str] = mapped_column(String(2000), nullable=True)
+    finish_next_link: Mapped[str] = mapped_column(String(2000), nullable=True)
+
     stt_key: Mapped[str] = mapped_column(String(2048), nullable=True)
     stt_endpoint: Mapped[str] = mapped_column(String(2048), nullable=True)
 

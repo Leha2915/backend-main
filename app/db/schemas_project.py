@@ -33,6 +33,9 @@ class ProjectCreate(BaseModel):
 
     stt_key: str = ""
     stt_endpoint: str = ""
+    finish_next_title: Optional[str] = None
+    finish_next_body: Optional[str] = None
+    finish_next_link: Optional[str] = None
 
 class ProjectOut(BaseModel):
     id: int
@@ -53,6 +56,9 @@ class ProjectOut(BaseModel):
     grouped: List[str]
 
     internal_id: Optional[str] = None
+    finish_next_title: Optional[str] = None
+    finish_next_body: Optional[str] = None
+    finish_next_link: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -83,3 +89,6 @@ class ProjectDetailsOut(BaseModel):
     time_limit: int
     r2_bucket: Optional[str] = None
     language: str
+    finish_next_title: Optional[str] = None
+    finish_next_body: Optional[str] = None
+    finish_next_link: Optional[str] = None

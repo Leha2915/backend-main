@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from typing import AsyncGenerator
 from .models_user import User
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.auth.auth_util import hash_password
 
@@ -44,6 +44,11 @@ async def init_models() -> None:
 
         # create_all ist synchron → via run_sync ausführen
         await conn.run_sync(Base.metadata.create_all)
+
+        # Ensure newer nullable project columns also exist on already provisioned DBs.
+        await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS finish_next_title VARCHAR(500)"))
+        await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS finish_next_body VARCHAR(2000)"))
+        await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS finish_next_link VARCHAR(2000)"))
 
     should_seed_admin = os.getenv("SEED_DEFAULT_ADMIN", "false").lower() in (
         "1",

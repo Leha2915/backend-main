@@ -23,6 +23,10 @@ from app.routers.auth import get_current_username
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_FINISH_NEXT_TITLE = "What happens next?"
+DEFAULT_FINISH_NEXT_BODY = "Please continue with the next part of the study by following this link:"
+DEFAULT_FINISH_NEXT_LINK = "https://survey.iism.kit.edu/index.php/821265?newtest=Y&lang=en"
+
 
 router = APIRouter()
 
@@ -31,6 +35,12 @@ def _resolve_secret_or_default(value: str | None, env_name: str) -> str:
     if value and value.strip():
         return value.strip()
     return os.getenv(env_name, "").strip()
+
+
+def _resolve_finish_text_or_default(value: str | None, default: str) -> str:
+    if value and value.strip():
+        return value.strip()
+    return default
 
 
 async def id_by_username(username: str, db: AsyncSession) -> int | None:
@@ -62,6 +72,9 @@ async def create_project(
     r2_access_key_id = _resolve_secret_or_default(payload.r2_access_key_id, "R2_ACCESS_KEY_ID_DEFAULT")
     r2_secret_access_key = _resolve_secret_or_default(payload.r2_secret_access_key, "R2_SECRET_ACCESS_KEY_DEFAULT")
     r2_bucket = _resolve_secret_or_default(payload.r2_bucket, "R2_BUCKET_DEFAULT")
+    finish_next_title = _resolve_finish_text_or_default(payload.finish_next_title, DEFAULT_FINISH_NEXT_TITLE)
+    finish_next_body = _resolve_finish_text_or_default(payload.finish_next_body, DEFAULT_FINISH_NEXT_BODY)
+    finish_next_link = _resolve_finish_text_or_default(payload.finish_next_link, DEFAULT_FINISH_NEXT_LINK)
 
     if not api_key:
         raise HTTPException(status_code=400, detail="Missing OpenAI API key")
@@ -103,6 +116,9 @@ async def create_project(
         internal_id=payload.internal_id,
         stt_key=encryption_service.encrypt(stt_key) if stt_key else None,
         stt_endpoint=stt_endpoint or None,
+        finish_next_title=finish_next_title,
+        finish_next_body=finish_next_body,
+        finish_next_link=finish_next_link,
     )
 
     db.add(project)
@@ -122,6 +138,9 @@ async def create_test_project(
     model = _resolve_secret_or_default(payload.model, "OPENAI_MODEL_DEFAULT")
     base_url = _resolve_secret_or_default(payload.base_url, "OPENAI_BASE_URL_DEFAULT") or "https://api.openai.com/v1"
     elevenlabs_api_key = _resolve_secret_or_default(payload.elevenlabs_api_key, "ELEVENLABS_API_KEY_DEFAULT")
+    finish_next_title = _resolve_finish_text_or_default(payload.finish_next_title, DEFAULT_FINISH_NEXT_TITLE)
+    finish_next_body = _resolve_finish_text_or_default(payload.finish_next_body, DEFAULT_FINISH_NEXT_BODY)
+    finish_next_link = _resolve_finish_text_or_default(payload.finish_next_link, DEFAULT_FINISH_NEXT_LINK)
 
     if not api_key:
         raise HTTPException(status_code=400, detail="Missing OpenAI API key")
@@ -156,6 +175,9 @@ async def create_test_project(
         time_limit = -1,
         language=payload.language,
         internal_id=payload.internal_id,
+        finish_next_title=finish_next_title,
+        finish_next_body=finish_next_body,
+        finish_next_link=finish_next_link,
     )
 
     db.add(project)
@@ -296,6 +318,9 @@ async def get_project_details(
         r2_bucket=project.r2_bucket,
 
         language=project.language,
+        finish_next_title=project.finish_next_title,
+        finish_next_body=project.finish_next_body,
+        finish_next_link=project.finish_next_link,
     )
 
 
