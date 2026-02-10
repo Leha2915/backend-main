@@ -13,7 +13,7 @@ from app.auth.auth_util import check_credentials, create_token, get_username, up
 
 USER_OR_PASSWORD_INCORRECT_MSG = "Username or password incorrect"
 
-LOGIN_EXP_MINUTES = 10
+LOGIN_EXP_MINUTES = 1440
 REFRESH_EXP_MINUTES = 480
 
 router = APIRouter(
