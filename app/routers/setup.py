@@ -19,6 +19,11 @@ class KeyTestRequest(BaseModel):
 class ModelListRequest(BaseModel):
     OPENAI_API_KEY: str | None = None
     base_url: str
+class StimuliSuggestRequest(BaseModel):
+    role_prompt: str
+    model: str
+    OPENAI_API_KEY: str | None = None
+    base_url: str = "https://api.openai.com/v1"
 
 
 def _resolve_openai_key(value: str | None) -> str:
@@ -73,3 +78,26 @@ async def test_key(req: KeyTestRequest):
         return {"ok": False, "reason": str(e)}
     except Exception:
         return {"ok": False, "reason": "Unexpected error occurred"}
+
+
+@router.post("/stimuli/suggest")
+async def suggest_stimuli(req: StimuliSuggestRequest):
+    openai_api_key = _resolve_openai_key(req.OPENAI_API_KEY)
+    if not openai_api_key:
+        raise HTTPException(status_code=400, detail="OPENAI_API_KEY missing")
+    try:
+        client = _client(openai_api_key, req.base_url)
+        completion = await client.chat.completions.create(
+            messages=[{"role": "user", "content": req.role_prompt}],
+            model=req.model,
+            presence_penalty=0,
+            temperature=1,
+            response_format={"type": "json_object"},
+        )
+        return completion.model_dump()
+    except AuthenticationError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except OpenAIError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
