@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate required secrets
         run: |
@@ -65,7 +67,7 @@ jobs:
           else
             git remote add heroku "https://heroku:${HEROKU_API_KEY}@git.heroku.com/${HEROKU_APP_NAME}.git"
           fi
-          git push heroku HEAD:main
+          git push heroku HEAD:main --force
 
       - name: Smoke test backend
         run: |
