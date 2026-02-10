@@ -1,25 +1,17 @@
-import os
-
-from fastapi import APIRouter, HTTPException, Cookie
+from fastapi import APIRouter, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import Depends
-from starlette.responses import JSONResponse
 
 from app.db import get_db
-from app.schemas.schemas_auth import TokenPair, UserLogin
+from app.schemas.schemas_auth import RefreshRequest, TokenPair, UserLogin
 
-from fastapi import Request, Response
+from fastapi import Request
 
 from app.auth.auth_util import check_credentials, create_token, get_username, update_refresh_token, \
     compare_refresh_to_db
 
 USER_OR_PASSWORD_INCORRECT_MSG = "Username or password incorrect"
-
-SEND_COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() in ("1", "true", "yes")
-COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "none").strip().lower()
-if COOKIE_SAMESITE not in {"lax", "strict", "none"}:
-    COOKIE_SAMESITE = "none"
 
 LOGIN_EXP_MINUTES = 10
 REFRESH_EXP_MINUTES = 480
@@ -29,80 +21,38 @@ router = APIRouter(
     tags=["auth-new"]
 )
 
-# ───────────────────────── Cookie-Logic ────────────────────────────
-
-def get_tokens_from_cookie(request: Request) -> TokenPair | None:
-    access_token = request.cookies.get("access_token")
-    refresh_token = request.cookies.get("refresh_token")
-    if access_token is None or refresh_token is None:
+def _get_bearer_token(request: Request) -> str | None:
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
         return None
 
-    return TokenPair(access_token=access_token, refresh_token=refresh_token)
+    parts = auth_header.strip().split(" ", 1)
+    if len(parts) != 2:
+        return None
+    scheme, token = parts[0], parts[1].strip()
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token
 
 
-def set_cookie(response: Response, access_token: str, refresh_token: str) -> None:
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=SEND_COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=SEND_COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE
-    )
-
-
-async def get_current_username(
-        response: Response,
-        access_token: str = Cookie(None),
-        refresh_token: str = Cookie(None),
-        db: AsyncSession = Depends(get_db)
-) -> str:
+async def get_current_username(request: Request, db: AsyncSession = Depends(get_db)) -> str:
     """
-    Das hier benutzen, um den Username aus den Access-Tokens im Cookie auszulesen.
+    Das hier benutzen, um den Username aus dem Bearer Access-Token auszulesen.
     Dafür einfach username: str = Depends(get_current_username) zur Methodensignatur im Endpoint hinzufügen.
     Falls der username None ist, muss das entsprechend gehandelt werden. Es bedeutet, dass der Nutzer nicht
     eingeloggt ist.
-
-    Im Frontend muss bei fetch von Endpoints bei denen man Auth braucht credentials: 'include' in den Options gesetzt
-    werden, sonst ist der return immer None.
     """
-    access_name = await get_username(access_token, db)
-    refresh_name = await get_username(refresh_token, db)
-
-    # Both tokens are invalid
-    if access_name is None and refresh_name is None:
+    access_token = _get_bearer_token(request)
+    if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-
-    # Access invalid, but refresh valid
-    if access_name is None and refresh_name is not None:
-        if not await compare_refresh_to_db(refresh_name, refresh_token, db):
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-
-        new_access_token = create_token(refresh_name, LOGIN_EXP_MINUTES)
-        new_refresh_token = create_token(refresh_name, REFRESH_EXP_MINUTES)
-        await update_refresh_token(refresh_name, new_refresh_token, db)
-        set_cookie(response, new_access_token, new_refresh_token)
-        return refresh_name
-
-    # Access valid, refresh invalid
-    if access_name is not None and refresh_name is None:
-        raise HTTPException(status_code=401, detail="Access revoked for security reasons")
-
-    # Name mismatch
-    if access_name != refresh_name:
-        raise HTTPException(status_code=401, detail="Token mismatch")
-
+    access_name = await get_username(access_token, db)
+    if access_name is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     return access_name
 
 # ───────────────────────── Endpoints ────────────────────────────
 
-@router.post("/login", status_code=200)
+@router.post("/login", status_code=200, response_model=TokenPair)
 async def login(
         payload: UserLogin,
         db: AsyncSession = Depends(get_db),
@@ -114,7 +64,23 @@ async def login(
     refresh_token = create_token(payload.username, REFRESH_EXP_MINUTES)
     await update_refresh_token(payload.username, refresh_token, db)
 
-    response = JSONResponse({"message": "Login successful!"})
-    set_cookie(response, access_token, refresh_token)
+    return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
-    return response
+
+@router.post("/refresh", status_code=200, response_model=TokenPair)
+async def refresh_tokens(
+    payload: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    refresh_name = await get_username(payload.refresh_token, db)
+    if refresh_name is None:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if not await compare_refresh_to_db(refresh_name, payload.refresh_token, db):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    new_access_token = create_token(refresh_name, LOGIN_EXP_MINUTES)
+    new_refresh_token = create_token(refresh_name, REFRESH_EXP_MINUTES)
+    await update_refresh_token(refresh_name, new_refresh_token, db)
+
+    return TokenPair(access_token=new_access_token, refresh_token=new_refresh_token)
