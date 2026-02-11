@@ -49,6 +49,7 @@ async def init_models() -> None:
         await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS finish_next_title VARCHAR(500)"))
         await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS finish_next_body VARCHAR(2000)"))
         await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS finish_next_link VARCHAR(2000)"))
+        await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS stt_provider VARCHAR(32)"))
 
     should_seed_admin = os.getenv("SEED_DEFAULT_ADMIN", "false").lower() in (
         "1",

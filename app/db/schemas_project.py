@@ -33,6 +33,7 @@ class ProjectCreate(BaseModel):
 
     stt_key: str = ""
     stt_endpoint: str = ""
+    stt_provider: str = "azure"
     finish_next_title: Optional[str] = None
     finish_next_body: Optional[str] = None
     finish_next_link: Optional[str] = None
@@ -59,6 +60,7 @@ class ProjectOut(BaseModel):
     finish_next_title: Optional[str] = None
     finish_next_body: Optional[str] = None
     finish_next_link: Optional[str] = None
+    stt_provider: Optional[str] = "azure"
 
     class Config:
         from_attributes = True
@@ -92,3 +94,4 @@ class ProjectDetailsOut(BaseModel):
     finish_next_title: Optional[str] = None
     finish_next_body: Optional[str] = None
     finish_next_link: Optional[str] = None
+    stt_provider: Optional[str] = "azure"

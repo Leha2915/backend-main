@@ -43,6 +43,13 @@ def _resolve_finish_text_or_default(value: str | None, default: str) -> str:
     return default
 
 
+def _resolve_stt_provider(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"azure", "karai"}:
+        return normalized
+    return "azure"
+
+
 async def id_by_username(username: str, db: AsyncSession) -> int | None:
     res = await db.execute(select(User).where(User.username == username))
     user = res.scalars().first()
@@ -68,6 +75,7 @@ async def create_project(
     elevenlabs_api_key = _resolve_secret_or_default(payload.elevenlabs_api_key, "ELEVENLABS_API_KEY_DEFAULT")
     stt_key = _resolve_secret_or_default(payload.stt_key, "AZURE_STT_KEY_DEFAULT")
     stt_endpoint = _resolve_secret_or_default(payload.stt_endpoint, "AZURE_STT_ENDPOINT_DEFAULT")
+    stt_provider = _resolve_stt_provider(payload.stt_provider)
     r2_account_id = _resolve_secret_or_default(payload.r2_account_id, "R2_ACCOUNT_ID_DEFAULT")
     r2_access_key_id = _resolve_secret_or_default(payload.r2_access_key_id, "R2_ACCESS_KEY_ID_DEFAULT")
     r2_secret_access_key = _resolve_secret_or_default(payload.r2_secret_access_key, "R2_SECRET_ACCESS_KEY_DEFAULT")
@@ -116,6 +124,7 @@ async def create_project(
         internal_id=payload.internal_id,
         stt_key=encryption_service.encrypt(stt_key) if stt_key else None,
         stt_endpoint=stt_endpoint or None,
+        stt_provider=stt_provider,
         finish_next_title=finish_next_title,
         finish_next_body=finish_next_body,
         finish_next_link=finish_next_link,
@@ -138,6 +147,9 @@ async def create_test_project(
     model = _resolve_secret_or_default(payload.model, "OPENAI_MODEL_DEFAULT")
     base_url = _resolve_secret_or_default(payload.base_url, "OPENAI_BASE_URL_DEFAULT") or "https://api.openai.com/v1"
     elevenlabs_api_key = _resolve_secret_or_default(payload.elevenlabs_api_key, "ELEVENLABS_API_KEY_DEFAULT")
+    stt_key = _resolve_secret_or_default(payload.stt_key, "AZURE_STT_KEY_DEFAULT")
+    stt_endpoint = _resolve_secret_or_default(payload.stt_endpoint, "AZURE_STT_ENDPOINT_DEFAULT")
+    stt_provider = _resolve_stt_provider(payload.stt_provider)
     finish_next_title = _resolve_finish_text_or_default(payload.finish_next_title, DEFAULT_FINISH_NEXT_TITLE)
     finish_next_body = _resolve_finish_text_or_default(payload.finish_next_body, DEFAULT_FINISH_NEXT_BODY)
     finish_next_link = _resolve_finish_text_or_default(payload.finish_next_link, DEFAULT_FINISH_NEXT_LINK)
@@ -175,6 +187,9 @@ async def create_test_project(
         time_limit = -1,
         language=payload.language,
         internal_id=payload.internal_id,
+        stt_key=encryption_service.encrypt(stt_key) if stt_key else None,
+        stt_endpoint=stt_endpoint or None,
+        stt_provider=stt_provider,
         finish_next_title=finish_next_title,
         finish_next_body=finish_next_body,
         finish_next_link=finish_next_link,
@@ -318,6 +333,7 @@ async def get_project_details(
         r2_bucket=project.r2_bucket,
 
         language=project.language,
+        stt_provider=project.stt_provider or "azure",
         finish_next_title=project.finish_next_title,
         finish_next_body=project.finish_next_body,
         finish_next_link=project.finish_next_link,

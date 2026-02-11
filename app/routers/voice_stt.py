@@ -45,6 +45,13 @@ PARALLEL_REQUESTS = 6
 HTTPX_TIMEOUT = httpx.Timeout(30.0, read=120.0, connect=10.0)
 
 
+def _resolve_stt_provider(value: Optional[str]) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"azure", "karai"}:
+        return normalized
+    return "azure"
+
+
 def _build_whisper_stream_url(extra: Optional[dict] = None) -> str:
     base = WHISPER_STREAM_BASE_URL
     params: Dict[str, str] = {}
@@ -515,11 +522,18 @@ async def stream_proxy(
         select(Project).where(Project.slug == slug)
     )
     proj = res.scalars().first()
+    if not proj:
+        await client_ws.close(code=1008, reason="Project not found")
+        return
 
     stt_key = enc.decrypt(proj.stt_key)
     stt_endpoint = proj.stt_endpoint
+    stt_provider = _resolve_stt_provider(proj.stt_provider)
 
-    #return await stream_with_whisper(client_ws)
+    if stt_provider == "karai":
+        await client_ws.close(code=1003, reason="Streaming STT not supported for KARAI provider")
+        return
+
     return await stream_with_azure(client_ws, stt_key, stt_endpoint)
 
 @router.get("/api/stream/test")
@@ -532,6 +546,12 @@ async def stt_test(
         select(Project).where(Project.slug == slug)
     )
     proj = res.scalars().first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    stt_provider = _resolve_stt_provider(proj.stt_provider)
+    if stt_provider == "karai":
+        return {"ok": True}
 
     stt_key = enc.decrypt(proj.stt_key)
     stt_endpoint = proj.stt_endpoint
@@ -553,6 +573,12 @@ async def transcribe_proxy(
         select(Project).where(Project.slug == slug)
     )
     proj = res.scalars().first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    stt_provider = _resolve_stt_provider(proj.stt_provider)
+    if stt_provider == "karai":
+        return await transcribe_with_karai(file, language)
 
     stt_key = enc.decrypt(proj.stt_key)
     stt_endpoint = proj.stt_endpoint

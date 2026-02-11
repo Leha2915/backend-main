@@ -48,6 +48,7 @@ class Project(Base):
 
     stt_key: Mapped[str] = mapped_column(String(2048), nullable=True)
     stt_endpoint: Mapped[str] = mapped_column(String(2048), nullable=True)
+    stt_provider: Mapped[str] = mapped_column(String(32), nullable=True)
 
     owner = relationship("User", back_populates="projects")
     User.projects = relationship("Project", back_populates="owner")
