@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from copy import deepcopy
 from datetime import datetime
-from typing import List, Literal, Tuple, Optional
+from typing import Any, List, Literal, Tuple, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import StreamingResponse
@@ -50,6 +51,87 @@ def _resolve_stt_provider(value: str | None) -> str:
     return "azure"
 
 
+def _to_serializable_block_list(
+    blocks: Optional[List[Any]],
+) -> Optional[List[dict[str, Any]]]:
+    if not blocks:
+        return None
+
+    serialized: List[dict[str, Any]] = []
+    for block in blocks:
+        if hasattr(block, "model_dump"):
+            serialized.append(block.model_dump())
+        elif isinstance(block, dict):
+            serialized.append(block)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid info block payload")
+
+    for block in serialized:
+        block_type = block.get("type")
+        if block_type == "section":
+            if not isinstance(block.get("title"), str) or not isinstance(block.get("body"), str):
+                raise HTTPException(status_code=400, detail="Invalid section block payload")
+            continue
+
+        if block_type == "question":
+            options = block.get("options")
+            if (
+                not isinstance(block.get("id"), str)
+                or not isinstance(block.get("prompt"), str)
+                or not isinstance(options, (list, tuple))
+                or len(options) != 2
+            ):
+                raise HTTPException(status_code=400, detail="Invalid question block payload")
+            for opt in options:
+                if not isinstance(opt, dict) or not isinstance(opt.get("id"), str) or not isinstance(opt.get("label"), str):
+                    raise HTTPException(status_code=400, detail="Invalid question option payload")
+            continue
+
+        raise HTTPException(status_code=400, detail="Unsupported info block type")
+    return serialized
+
+
+def _build_overridden_blocks(
+    *,
+    lang: str,
+    purpose_title: Optional[str],
+    purpose_body: Optional[str],
+    task_title: Optional[str],
+    task_body: Optional[str],
+    question2_prompt: Optional[str],
+) -> Optional[List[dict[str, Any]]]:
+    if not any([
+        purpose_title and purpose_title.strip(),
+        purpose_body and purpose_body.strip(),
+        task_title and task_title.strip(),
+        task_body and task_body.strip(),
+        question2_prompt and question2_prompt.strip(),
+    ]):
+        return None
+
+    base_blocks = PROJECT_INFO_BLOCKS.get(lang) or PROJECT_INFO_BLOCKS.get("en")
+    if not base_blocks:
+        return None
+
+    serialized = [b.model_dump() for b in deepcopy(base_blocks)]
+    for idx, block in enumerate(serialized):
+        if block.get("type") == "section" and idx == 0:
+            if purpose_title and purpose_title.strip():
+                block["title"] = purpose_title.strip()
+            if purpose_body and purpose_body.strip():
+                block["body"] = purpose_body.strip()
+        if block.get("type") == "section" and idx == 3:
+            if task_title and task_title.strip():
+                block["title"] = task_title.strip()
+            if task_body and task_body.strip():
+                block["body"] = task_body.strip()
+        if block.get("type") == "question" and block.get("id") == "goals":
+            if question2_prompt and question2_prompt.strip():
+                block["prompt"] = question2_prompt.strip()
+
+    return serialized
+
+
 async def id_by_username(username: str, db: AsyncSession) -> int | None:
     res = await db.execute(select(User).where(User.username == username))
     user = res.scalars().first()
@@ -83,6 +165,22 @@ async def create_project(
     finish_next_title = _resolve_finish_text_or_default(payload.finish_next_title, DEFAULT_FINISH_NEXT_TITLE)
     finish_next_body = _resolve_finish_text_or_default(payload.finish_next_body, DEFAULT_FINISH_NEXT_BODY)
     finish_next_link = _resolve_finish_text_or_default(payload.finish_next_link, DEFAULT_FINISH_NEXT_LINK)
+    chosen_lang = (payload.language or "en").split("-")[0]
+    info_blocks_en = _to_serializable_block_list(payload.info_blocks_en)
+    info_blocks_de = _to_serializable_block_list(payload.info_blocks_de)
+    lang_overrides = _build_overridden_blocks(
+        lang=chosen_lang,
+        purpose_title=payload.info_purpose_title,
+        purpose_body=payload.info_purpose_body,
+        task_title=payload.info_task_title,
+        task_body=payload.info_task_body,
+        question2_prompt=payload.info_question2_prompt,
+    )
+    if lang_overrides:
+        if chosen_lang == "de":
+            info_blocks_de = lang_overrides
+        else:
+            info_blocks_en = lang_overrides
 
     if not api_key:
         raise HTTPException(status_code=400, detail="Missing OpenAI API key")
@@ -128,6 +226,8 @@ async def create_project(
         finish_next_title=finish_next_title,
         finish_next_body=finish_next_body,
         finish_next_link=finish_next_link,
+        info_blocks_en=info_blocks_en,
+        info_blocks_de=info_blocks_de,
     )
 
     db.add(project)
@@ -153,6 +253,22 @@ async def create_test_project(
     finish_next_title = _resolve_finish_text_or_default(payload.finish_next_title, DEFAULT_FINISH_NEXT_TITLE)
     finish_next_body = _resolve_finish_text_or_default(payload.finish_next_body, DEFAULT_FINISH_NEXT_BODY)
     finish_next_link = _resolve_finish_text_or_default(payload.finish_next_link, DEFAULT_FINISH_NEXT_LINK)
+    chosen_lang = (payload.language or "en").split("-")[0]
+    info_blocks_en = _to_serializable_block_list(payload.info_blocks_en)
+    info_blocks_de = _to_serializable_block_list(payload.info_blocks_de)
+    lang_overrides = _build_overridden_blocks(
+        lang=chosen_lang,
+        purpose_title=payload.info_purpose_title,
+        purpose_body=payload.info_purpose_body,
+        task_title=payload.info_task_title,
+        task_body=payload.info_task_body,
+        question2_prompt=payload.info_question2_prompt,
+    )
+    if lang_overrides:
+        if chosen_lang == "de":
+            info_blocks_de = lang_overrides
+        else:
+            info_blocks_en = lang_overrides
 
     if not api_key:
         raise HTTPException(status_code=400, detail="Missing OpenAI API key")
@@ -193,6 +309,8 @@ async def create_test_project(
         finish_next_title=finish_next_title,
         finish_next_body=finish_next_body,
         finish_next_link=finish_next_link,
+        info_blocks_en=info_blocks_en,
+        info_blocks_de=info_blocks_de,
     )
 
     db.add(project)
@@ -823,10 +941,36 @@ PROJECT_INFO_BLOCKS: dict[str, List[SectionBlock | QuestionBlock]] = {
 
 @router.get("/projects/{slug}/info", response_model=InfoBlocksResponse)
 async def get_project_info(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
     lang: Optional[str] = Query(None)
 ):
     chosen = (lang or "en").split("-")[0]
-    blocks = PROJECT_INFO_BLOCKS.get(chosen) or PROJECT_INFO_BLOCKS.get("en")
+    if chosen not in {"en", "de"}:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "unsupported_language",
+                "message": f"Unsupported language '{chosen}'. Allowed values are 'en' and 'de'.",
+            },
+        )
+
+    res = await db.execute(select(Project).where(Project.slug == slug))
+    project = res.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    blocks = project.info_blocks_de if chosen == "de" else project.info_blocks_en
+
     if not blocks:
-        raise HTTPException(status_code=404, detail="no info available")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "project_not_migrated",
+                "message": "Project info blocks are missing for requested language.",
+                "slug": project.slug,
+                "language": chosen,
+            },
+        )
     return InfoBlocksResponse(blocks=blocks)

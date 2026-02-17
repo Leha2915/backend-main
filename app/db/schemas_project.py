@@ -1,6 +1,25 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Literal, Optional, Tuple
+
+
+class QuestionOptionIn(BaseModel):
+    id: str
+    label: str
+
+
+class QuestionBlockIn(BaseModel):
+    type: Literal["question"] = "question"
+    id: str
+    prompt: str
+    options: Tuple[QuestionOptionIn, QuestionOptionIn]
+    required: Optional[bool] = True
+
+
+class SectionBlockIn(BaseModel):
+    type: Literal["section"] = "section"
+    title: str
+    body: str
 
 class ProjectCreate(BaseModel):
     topic: str
@@ -37,6 +56,13 @@ class ProjectCreate(BaseModel):
     finish_next_title: Optional[str] = None
     finish_next_body: Optional[str] = None
     finish_next_link: Optional[str] = None
+    info_blocks_en: Optional[List[SectionBlockIn | QuestionBlockIn]] = None
+    info_blocks_de: Optional[List[SectionBlockIn | QuestionBlockIn]] = None
+    info_purpose_title: Optional[str] = None
+    info_purpose_body: Optional[str] = None
+    info_task_title: Optional[str] = None
+    info_task_body: Optional[str] = None
+    info_question2_prompt: Optional[str] = None
 
 class ProjectOut(BaseModel):
     id: int
@@ -61,6 +87,8 @@ class ProjectOut(BaseModel):
     finish_next_body: Optional[str] = None
     finish_next_link: Optional[str] = None
     stt_provider: Optional[str] = "azure"
+    info_blocks_en: Optional[List[dict[str, Any]]] = None
+    info_blocks_de: Optional[List[dict[str, Any]]] = None
 
     class Config:
         from_attributes = True
@@ -95,3 +123,5 @@ class ProjectDetailsOut(BaseModel):
     finish_next_body: Optional[str] = None
     finish_next_link: Optional[str] = None
     stt_provider: Optional[str] = "azure"
+    info_blocks_en: Optional[List[dict[str, Any]]] = None
+    info_blocks_de: Optional[List[dict[str, Any]]] = None

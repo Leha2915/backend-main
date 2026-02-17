@@ -1,6 +1,6 @@
 from sqlalchemy import ForeignKey, String, func, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from .base import Base
 from app.db.models_user import User
 from datetime import datetime
@@ -45,6 +45,8 @@ class Project(Base):
     finish_next_title: Mapped[str] = mapped_column(String(500), nullable=True)
     finish_next_body: Mapped[str] = mapped_column(String(2000), nullable=True)
     finish_next_link: Mapped[str] = mapped_column(String(2000), nullable=True)
+    info_blocks_en: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
+    info_blocks_de: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
 
     stt_key: Mapped[str] = mapped_column(String(2048), nullable=True)
     stt_endpoint: Mapped[str] = mapped_column(String(2048), nullable=True)
